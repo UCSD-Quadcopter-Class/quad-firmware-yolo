@@ -2,8 +2,8 @@
 #include <serLCD.h>
 #include <Gimbal.h>
 
-#define GIMBAL_MAX 1500
-#define GIMBAL_MIN 0
+#define GIMBAL_MAX 900 //not actually max value, but scales value
+#define GIMBAL_MIN 0   //not actually min value, but scales value
 
 //LCD
 serLCD mon;
@@ -18,6 +18,7 @@ int right_y = 3; //a3 pitch
 Gimbal left_gimbal (left_x, left_y);
 Gimbal right_gimbal (right_x, right_y);
 
+char * space = " ";
 void setup() {
   //init gimbal bounds
   right_gimbal.set_x_bounds(GIMBAL_MIN, GIMBAL_MAX);
@@ -44,13 +45,27 @@ void loop() {
 
   mon.setCursor(0, 0);
   mon.print(l_g_v.x);
+
+  if(l_g_v.x < 1000)
+    mon.print(space);
+    
   mon.setCursor(0, 8);
   mon.print(l_g_v.y);
 
+  if(l_g_v.y < 1000)
+    mon.print(space);
+
   mon.setCursor(1, 0);
   mon.print(r_g_v.x);
+
+  if(r_g_v.x < 1000)
+    mon.print(space);
+    
   mon.setCursor(1, 8);
   mon.print(r_g_v.y);
+
+  if(r_g_v.y < 1000)
+    mon.print(space);
   
   //print_gimbal_pos(l_g_v, r_g_v);  
 }
