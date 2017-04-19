@@ -13,11 +13,9 @@
 #include <radio.h>
 
 void setup() {
-  Serial1.begin(115200);
-  Serial1.println("[yolo] Receiving board connected");
+  rfBegin(22);
 }
 
 void loop() {
-  
   
 }

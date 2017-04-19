@@ -40,10 +40,10 @@ char * space = " ";
  ********************************************************************/
 void setup() {
   //init gimbal bounds
-  right_gimbal.set_x_bounds(GIMBAL_MIN, GIMBAL_MAX);
-  right_gimbal.set_y_bounds(GIMBAL_MIN, GIMBAL_MAX);
   left_gimbal.set_x_bounds(GIMBAL_MIN, GIMBAL_MAX);
   left_gimbal.set_y_bounds(GIMBAL_MIN, GIMBAL_MAX);
+  right_gimbal.set_x_bounds(GIMBAL_MAX, GIMBAL_MIN);
+  right_gimbal.set_y_bounds(GIMBAL_MAX, GIMBAL_MIN);
 
   //init serLCD mon
   mon.clear();
@@ -52,9 +52,10 @@ void setup() {
   //mon.autoscroll(); //autoscroll is enabled by default it seems
 
   //init radio
-  Serial1.begin(115200);
-  Serial1.println("[yolo] Transmiting board connected");
-
+  //Serial1.begin(115200);
+  //Serial1.println("[yolo] Transmiting board connected");
+  rfBegin(22);
+  
   //init serial monitor
   //Serial.begin(115200);
   //Serial.print("Initialization complete");
@@ -75,6 +76,16 @@ void loop() {
 
   //TODO hook up motor and control it using throttle (l_g_v.y)
 
+  //int throttle = l_g_v.y / 6;
+  //auto reading = l_g_v.y/6;
+  /*
+  mon.setCursor(0, 0);
+  mon.print("Value: ");
+  mon.print(reading);
+  analogWrite(3, reading);
+  if(reading < 100)
+    mon.print(space);
+  */
   delay(100);
 }
 
