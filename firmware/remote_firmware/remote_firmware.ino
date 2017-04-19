@@ -51,6 +51,10 @@ void setup() {
   mon.setBrightness(15); // can go from 1-30
   //mon.autoscroll(); //autoscroll is enabled by default it seems
 
+  //init radio
+  Serial1.begin(115200);
+  Serial1.println("[yolo] Transmiting board connected");
+
   //init serial monitor
   //Serial.begin(115200);
   //Serial.print("Initialization complete");
