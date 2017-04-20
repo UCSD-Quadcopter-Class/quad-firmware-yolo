@@ -40,10 +40,10 @@ char * space = " ";
  ********************************************************************/
 void setup() {
   //init gimbal bounds
-  left_gimbal.set_x_bounds(GIMBAL_MIN, GIMBAL_MAX);
-  left_gimbal.set_y_bounds(GIMBAL_MIN, GIMBAL_MAX);
-  right_gimbal.set_x_bounds(GIMBAL_MAX, GIMBAL_MIN);
-  right_gimbal.set_y_bounds(GIMBAL_MAX, GIMBAL_MIN);
+  left_gimbal.set_x_bounds(131, 818);
+  left_gimbal.set_y_bounds(135, 818);
+  right_gimbal.set_x_bounds(818, 118);
+  right_gimbal.set_y_bounds(818, 116);
 
   //init serLCD mon
   mon.clear();
@@ -57,8 +57,8 @@ void setup() {
   rfBegin(22);
   
   //init serial monitor
-  //Serial.begin(115200);
-  //Serial.print("Initialization complete");
+  Serial.begin(115200);
+  Serial.print("Initialization complete");
 }
 
  /********************************************************************
@@ -77,15 +77,12 @@ void loop() {
   //TODO hook up motor and control it using throttle (l_g_v.y)
 
   //int throttle = l_g_v.y / 6;
-  //auto reading = l_g_v.y/6;
-  /*
-  mon.setCursor(0, 0);
-  mon.print("Value: ");
-  mon.print(reading);
+  auto reading = l_g_v.y;
+  
+  //mon.setCursor(0, 0);
+  //mon.print("Value: ");
+  //mon.print(reading);
   analogWrite(3, reading);
-  if(reading < 100)
-    mon.print(space);
-  */
   delay(100);
 }
 
@@ -105,33 +102,31 @@ void display_gimbal_pos(Vector2 l_g_v, Vector2 r_g_v) {
   //mon.clear() is slow, don't use it if possible
   mon.setCursor(0, 0);
   mon.print("LX:");
-  mon.print(l_g_v.x);
-
-  if(l_g_v.x < 1000)
-    mon.print(space);
+  print_val(l_g_v.x);
     
   mon.setCursor(1, 0);
   mon.print("LY:");
-  mon.print(l_g_v.y);
+  print_val(l_g_v.y);
 
-  if(l_g_v.y < 1000)
-    mon.print(space);
 
   mon.setCursor(0, 8);
   mon.print("RX:");
-  mon.print(r_g_v.x);
-
-  if(r_g_v.x < 1000)
-    mon.print(space);
-    
+  print_val(r_g_v.x);
+  
   mon.setCursor(1, 8);
   mon.print("RY:");
-  mon.print(r_g_v.y);
+  print_val(r_g_v.y);
 
-  if(r_g_v.y < 1000)
-    mon.print(space);
 }
-
+void print_val( int val ) {
+    mon.print(val);
+    if(val < 1000)
+      mon.print(space);
+    if(val < 100 )
+      mon.print(space);
+    if(val < 10 )
+      mon.print(space);
+}
  /********************************************************************
  | Routine Name: print_gimbal_pos
  | File:         remote_firmware.ino

@@ -29,5 +29,14 @@ Vector2 Gimbal::read()
 	auto _y = analogRead(_pinY);
 	rv.x = map(_x, _x_lower_bound, _x_upper_bound, _GIMBAL_MIN, _GIMBAL_MAX);
 	rv.y = map(_y, _y_lower_bound, _y_upper_bound, _GIMBAL_MIN, _GIMBAL_MAX);
+    rv.x = constrain(rv.x, _GIMBAL_MIN, _GIMBAL_MAX);
+    rv.y = constrain(rv.y, _GIMBAL_MIN, _GIMBAL_MAX);
+	return rv;
+}
+Vector2 Gimbal::read_raw()
+{
+	auto rv = Vector2();
+	rv.x = analogRead(_pinX);
+	rv.y = analogRead(_pinY);
 	return rv;
 }
