@@ -31,7 +31,7 @@ Gimbal right_gimbal (right_x, right_y);
 serLCD mon;
 
 char * space = " ";
-
+long last_update_time;
  /********************************************************************
  | Routine Name: setup
  | File:         remote_firmware.ino
@@ -55,10 +55,10 @@ void setup() {
   //Serial1.begin(115200);
   //Serial1.println("[yolo] Transmiting board connected");
   rfBegin(22);
-  
+  last_update_time = 0;
   //init serial monitor
-  Serial.begin(115200);
-  Serial.print("Initialization complete");
+  //Serial.begin(115200);
+  //Serial.print("Initialization complete");
 }
 
  /********************************************************************
@@ -71,19 +71,23 @@ void setup() {
 void loop() {
   Vector2 l_g_v = left_gimbal.read();
   Vector2 r_g_v = right_gimbal.read();
-  
-  display_gimbal_pos(l_g_v, r_g_v);
-
-  //TODO hook up motor and control it using throttle (l_g_v.y)
-
-  //int throttle = l_g_v.y / 6;
+  long t_curr = millis();
+  if( t_curr - last_update_time > 50 ) {
+      display_gimbal_pos(l_g_v, r_g_v);
+      last_update_time = t_curr;
+  }
+  //get throttle
   auto reading = l_g_v.y;
-  
+  rfWrite(reading);
+
+  //prints specifically throttle to screen
   //mon.setCursor(0, 0);
   //mon.print("Value: ");
   //mon.print(reading);
-  analogWrite(3, reading);
-  delay(100);
+
+  //for hooking remote directly to motor
+  //analogWrite(3, reading);
+  
 }
 
  /********************************************************************
