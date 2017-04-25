@@ -11,11 +11,14 @@
  *****************************************************************************/
 
 #include <radio.h>
-
+#define MOTOR_PIN_1 3
 void setup() {
   rfBegin(22);
 }
 
 void loop() {
-  
+  while(rfAvailable() ) {
+    auto throttle = rfRead();
+    analogWrite(MOTOR_PIN_1, throttle);
+  }
 }
