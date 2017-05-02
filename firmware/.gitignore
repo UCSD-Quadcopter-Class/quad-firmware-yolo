@@ -1,0 +1,6 @@
+**/Debug/**
+**/Release/**
+*.vs/**
+*.vcx**
+*.vsarduino.h
+**/__vm/**

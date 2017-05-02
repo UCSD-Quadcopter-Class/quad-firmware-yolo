@@ -9,11 +9,21 @@
  Description:     Contains RedBoard code for remote to read from gimbals,
                   display to LCD screen, and transmit radio signals.
  *****************************************************************************/
- 
+#define PIN_BTN1    16    // PG0 (schematic) G0 (red board)
+#define PIN_BTN2    17    // PG1 (schematic) G1 (red board)
+#define PIN_LED_BLUE  22    // PD6 (schematic) D4 (red board)
+#define PIN_LED_GRN   23    // PD5 (schematic) D5 (red board)
+#define PIN_LED_RED   24    // PD4 (schematic) D6 (red board)   
+#define UPDATE_TIME 50;
+#include<Gadgetron.h>
+
 #include <radio.h>
 #include <serLCD.h>
 #include <Gimbal.h>
-
+#include <quad.h>
+#include "FlightController_StateMachine.h"
+MomentaryButton btn1(PIN_BTN1);
+MomentaryButton btn2(PIN_BTN2);
 #define GIMBAL_MAX 900 //not actually max value, but scales value
 #define GIMBAL_MIN 0   //not actually min value, but scales value
 
@@ -32,6 +42,7 @@ serLCD mon;
 
 char * space = " ";
 long last_update_time;
+long t_curr;
  /********************************************************************
  | Routine Name: setup
  | File:         remote_firmware.ino
@@ -44,7 +55,8 @@ void setup() {
   left_gimbal.set_y_bounds(135, 818);
   right_gimbal.set_x_bounds(818, 118);
   right_gimbal.set_y_bounds(818, 116);
-
+  btn1.setup();
+  btn2.setup();
   //init serLCD mon
   mon.clear();
   mon.display();
@@ -57,8 +69,8 @@ void setup() {
   rfBegin(22);
   last_update_time = 0;
   //init serial monitor
-  //Serial.begin(115200);
-  //Serial.print("Initialization complete");
+  Serial.begin(115200);
+  Serial.print("Initialization complete");
 }
 
  /********************************************************************
@@ -69,17 +81,8 @@ void setup() {
  |              send commands to drone using radio.
  ********************************************************************/
 void loop() {
-  Vector2 l_g_v = left_gimbal.read();
-  Vector2 r_g_v = right_gimbal.read();
-  long t_curr = millis();
-  if( t_curr - last_update_time > 50 ) {
-      display_gimbal_pos(l_g_v, r_g_v);
-      last_update_time = t_curr;
-  }
-  //get throttle
-  auto reading = l_g_v.y;
-  rfWrite(reading);
-
+	t_curr = millis();
+	update_states();
   //prints specifically throttle to screen
   //mon.setCursor(0, 0);
   //mon.print("Value: ");
@@ -89,7 +92,34 @@ void loop() {
   //analogWrite(3, reading);
   
 }
+bool should_update_display() {
+	bool rv = t_curr - last_update_time > UPDATE_TIME;
+	if(rv)
+		last_update_time = t_curr;
+	return rv;
+}
 
+extern "C" {
+	void do_default() {
+		Vector2 l_g_v = left_gimbal.read();
+		Vector2 r_g_v = right_gimbal.read();
+		if (should_update_display) {
+			display_gimbal_pos(l_g_v, r_g_v);
+		}
+		//get throttle
+		int16_t buf[5] = { SECRET_NUMBER, l_g_v.x, l_g_v.y, r_g_v.x, r_g_v.y };
+		rfWrite((uint8_t*)buf, 10);
+	}
+	void do_set_PID() {
+
+	}
+	boolean on_buttons() {
+		return (!btn1.isPressed()) && (!btn2.isPressed());
+	}
+	void on_any_transition() {
+
+	}
+}
  /********************************************************************
  | Routine Name: display_gimbal_pos
  | File:         remote_firmware.ino
