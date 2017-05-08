@@ -1,0 +1,1 @@
+We Low Pass Filtered and took a moving average of accelerometer readings to stabilize the output from the accelerometer. Then we used a complementary filter to combine the gyroscope (0.96) and accelerometer (0.04) readings. 
