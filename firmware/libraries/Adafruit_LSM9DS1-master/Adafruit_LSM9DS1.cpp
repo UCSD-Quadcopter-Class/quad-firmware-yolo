@@ -253,9 +253,15 @@ void Adafruit_LSM9DS1::setupAccel ( lsm9ds1AccelRange_t range )
 {
   uint8_t reg = read8(XGTYPE, LSM9DS1_REGISTER_CTRL_REG6_XL);
   reg &= ~(0b00011000);
+  reg |= ( 0b001 << 5 ); // ODR bits
+  reg |= ( 0b111 );
   reg |= range;
   //Serial.println("set range: ");
+  uint8_t reg7 = read8(XGTYPE, LSM9DS1_REGISTER_CTRL_REG7_XL);
+  reg7 &= ~(0b00011111);
+  reg7 |= ( 0b111 << 5 ); // ODR bits
   write8(XGTYPE, LSM9DS1_REGISTER_CTRL_REG6_XL, reg );
+  write8(XGTYPE, LSM9DS1_REGISTER_CTRL_REG7_XL, reg7 );
   
   switch (range)
   {

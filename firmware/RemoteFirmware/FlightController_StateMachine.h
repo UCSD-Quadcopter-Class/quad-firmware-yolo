@@ -20,6 +20,7 @@ extern "C" {
 #define SET_MIDPOINT_STATE 13
 #define Q14_STATE 14
 #define TOGGLE_DEBUG_STATE 15
+#define READ_BAROMETER_STATE 16
 #include "Arduino.h"
 long transitioned_at = 0;
 short state = DEFAULT_STATE;
@@ -36,17 +37,20 @@ extern void do_shift_control_left(void);
 extern void do_shift_control_right(void);
 extern void do_set_midpoint(void);
 extern void do_toggle_debug(void);
+extern void do_read_barometer(void);
 // Transitional Logic Functions
-extern bool on_set_button();
-extern bool pid_button();
-extern bool should_set_I();
-extern bool should_set_P();
-extern bool should_set_D();
-extern bool should_set_midpoint();
-extern bool on_music_input();
-extern bool debug_button();
 extern bool should_shift_ctl_right();
+extern bool on_set_button();
+extern bool pid_value_request();
+extern bool should_set_D();
+extern bool pid_button();
+extern bool on_music_input();
+extern bool should_read_barometer();
+extern bool should_set_I();
+extern bool should_set_midpoint();
+extern bool should_set_P();
 extern bool should_shift_ctl_left();
+extern bool debug_button();
 extern void on_any_transition(void);
 void update_states(void) {
 	short prev_state = state;
@@ -88,30 +92,37 @@ void update_states(void) {
 	case TOGGLE_DEBUG_STATE:
 			do_toggle_debug();
 			break;
+	case READ_BAROMETER_STATE:
+			do_read_barometer();
+			break;
 	}
 	// The following switch statement handles the HLSM's state transition logic
 	switch (state) {
 	case DEFAULT_STATE:
-			if (on_music_input())
-				state = Q8_STATE;
+			if (pid_value_request())
+				state = WRITE_PID_VALS_STATE;
+			if (should_read_barometer())
+				state = READ_BAROMETER_STATE;
 			if (pid_button())
 				state = PREP_WRITE_PID_STATE;
+			if (on_music_input())
+				state = Q8_STATE;
 			if (debug_button())
 				state = Q14_STATE;
 			break;
 	case SET_PID_STATE:
 			if (should_shift_ctl_right())
 				state = SHIFT_CONTROL_RIGHT_STATE;
-			if (should_set_D())
-				state = SET_D_STATE;
-			if (should_set_I())
-				state = SET_I_STATE;
 			if (should_shift_ctl_left())
 				state = SHIFT_CONTROL_LEFT_STATE;
 			if (pid_button())
 				state = WRITE_PID_VALS_STATE;
+			if (should_set_D())
+				state = SET_D_STATE;
 			if (should_set_P())
 				state = SET_P_STATE;
+			if (should_set_I())
+				state = SET_I_STATE;
 			break;
 	case PREP_WRITE_PID_STATE:
 			if (!pid_button())
@@ -158,13 +169,15 @@ void update_states(void) {
 			state = DEFAULT_STATE;
 			break;
 	case Q14_STATE:
-			if (should_set_midpoint())
-				state = SET_MIDPOINT_STATE;
 			if (!debug_button())
 				state = TOGGLE_DEBUG_STATE;
+			if (should_set_midpoint())
+				state = SET_MIDPOINT_STATE;
 			break;
 	case TOGGLE_DEBUG_STATE:
 			state = DEFAULT_STATE;
+			break;
+	case READ_BAROMETER_STATE:
 			break;
 	}
 	if (prev_state != state) {

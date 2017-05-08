@@ -245,6 +245,10 @@ class Adafruit_LSM9DS1
     Sensor& getMag   ( void ) { return _magSensor; }
     Sensor& getGyro  ( void ) { return _gyroSensor; }
     Sensor& getTemp  ( void ) { return _tempSensor; }
+    Sensor _accelSensor;
+    Sensor _magSensor;
+    Sensor _gyroSensor;
+    Sensor _tempSensor;
 
   private:
     boolean _i2c;
@@ -257,10 +261,6 @@ class Adafruit_LSM9DS1
     int32_t _lsm9dso_sensorid_mag;
     int32_t _lsm9dso_sensorid_gyro;
     int32_t _lsm9dso_sensorid_temp;
-    Sensor _accelSensor;
-    Sensor _magSensor;
-    Sensor _gyroSensor;
-    Sensor _tempSensor;
 
     /* Functions to get individual sensor measurements and metadata. */
     /* Note that these functions will NOT update the sensor state before getting */

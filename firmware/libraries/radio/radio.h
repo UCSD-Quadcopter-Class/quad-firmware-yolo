@@ -25,14 +25,20 @@
 */
   
 #include <Arduino.h> // Required for digitalWrites, etc.
+#include "checksum.h"
+
 
 // Board pin definitions.
 const int RX_LED = 34;  // B6 - RF RX LED
 const int TX_LED = 35;  // B7 - RF TX LED
 uint8_t rssiRaw; // Global variable shared between RX ISRs
 
+bool IS_RADIO_VALID = 0;
+
 // A buffer to maintain data being received by radio.
 const int RF_BUFFER_SIZE = 127;
+  // Maximum transmission is 128 bytes
+uint8_t radio_buffer[RF_BUFFER_SIZE];
 struct ringBuffer
 {
   unsigned char buffer[RF_BUFFER_SIZE];
@@ -41,18 +47,29 @@ struct ringBuffer
 } radioRXBuffer;
 
 
+bool is_radio_valid() {
+	bool rv = IS_RADIO_VALID;
+	IS_RADIO_VALID = false;
+	return rv;
+}
+
+uint8_t rf_get_msg_length() {
+	return TST_RX_LENGTH - 4;
+}
+void rfFlush() {
+	for (int i = 0; i < RF_BUFFER_SIZE; i++)
+	{
+		radioRXBuffer.buffer[i] = 0;
+	}
+	radioRXBuffer.head = radioRXBuffer.tail = 0;
+}
 // Initialize the RFA1's low-power 2.4GHz transciever.
 // Sets up the state machine, and gets the radio into
 // the RX_ON state. Interrupts are enabled for RX
 // begin and end, as well as TX end.
 uint8_t rfBegin(uint8_t channel)
 {
-  for (int i=0; i<128; i++)
-  {
-    radioRXBuffer.buffer[i] = 0;
-  }
-  radioRXBuffer.tail = 0;
-  radioRXBuffer.head = 0;
+	rfFlush();
 
   // Setup RX/TX LEDs: These are pins B6/34 (RX) and B7/35 (TX).
   pinMode(RX_LED, OUTPUT);
@@ -168,6 +185,44 @@ void rfWrite(uint8_t b)
   TRX_STATE = (TRX_STATE & 0xE0) | RX_ON;
 }
 
+/** 
+ *  Description: This function will transmit a packet of bytes out of the radio
+ *  Arguments:
+ *  b - pointer to the location in memory that we want to send over the radio
+ *  length - the length of the buffer. The datasheet suggests that the
+ *           radio can send packets of up-to 127 bytes long. In practice, it
+ *           only sends approximately 125 bytes successfully.
+ */
+void rfWrite(uint8_t * b, uint8_t length)
+{
+
+  // Transceiver State Control Register -- TRX_STATE
+  // This regiseter controls the states of the radio.
+  // Set to the PLL_ON state - this state begins the TX.
+  TRX_STATE = (TRX_STATE & 0xE0) | PLL_ON;  // Set to TX start state
+  while(!(TRX_STATUS & PLL_ON));  // Wait for PLL to lock
+
+  digitalWrite(TX_LED, HIGH);  // Turn on TX LED
+
+  uint16_t checksum = fletcher16(b, length);
+  // Start of frame buffer - TRXFBST
+  // This is the first byte of the 128 byte frame. It should contain
+  // the length of the transmission.
+  TRXFBST = length + sizeof(uint16_t) +2 ;
+  // Now copy the checksum into the address directly after TRXFBST.
+  memcpy((void *)(&TRXFBST+1), &checksum, sizeof(uint16_t));
+  memcpy((void *)(&TRXFBST+3), b, length);
+
+  // Transceiver Pin Register -- TRXPR.
+  // From the PLL_ON state, setting SLPTR high will initiate the TX.
+  TRXPR |= (1<<SLPTR);   // SLPTR = 1
+  TRXPR &= ~(1<<SLPTR);  // SLPTR = 0  // Then bring it back low
+
+  // After sending the byte, set the radio back into the RX waiting state.
+  TRX_STATE = (TRX_STATE & 0xE0) | RX_ON;
+}
+
+
 // Returns how many unread bytes remain in the radio RX buffer.
 // 0 means the buffer is empty. Maxes out at RF_BUFFER_SIZE.
 unsigned int rfAvailable()
@@ -192,6 +247,10 @@ char rfRead()
   }
 }
 
+char rfRead(uint8_t * dest, uint8_t length) {
+
+}
+
 // This interrupt is called when radio TX is complete. We'll just
 // use it to turn off our TX LED.
 ISR(TRX24_TX_END_vect)
@@ -214,8 +273,6 @@ ISR(TRX24_RX_START_vect)
 ISR(TRX24_RX_END_vect)
 {
   uint8_t length;
-  // Maximum transmission is 128 bytes
-  uint8_t tempFrame[RF_BUFFER_SIZE];
 
   // The received signal must be above a certain threshold.
   if (PHY_RSSI & (1<<RX_CRC_VALID))
@@ -223,21 +280,19 @@ ISR(TRX24_RX_END_vect)
     // The length of the message will be the first byte received.
     length = TST_RX_LENGTH;
     // The remaining bytes will be our received data.
-    memcpy(&tempFrame[0], (void*)&TRXFBST, length);
+	uint8_t * addr = (uint8_t *)&TRXFBST;
+	uint16_t checksum = fletcher16(addr + sizeof(uint16_t), length - sizeof(uint16_t) -2);
+	uint16_t rec = ((uint16_t*)addr)[0];
+	IS_RADIO_VALID = checksum == rec;
+	/*
+	Serial.print(checksum);
+	Serial.print(" " );
+	Serial.println(rec);
+	*/
+	memcpy(&radio_buffer[0], addr+sizeof(uint16_t), length);
     
-    // Now we need to collect the frame into our receive buffer.
-    //  k will be used to make sure we don't go above the length
-    //  i will make sure we don't overflow our buffer.
-    unsigned int k = 0;
-    unsigned int i = (radioRXBuffer.head + 1) % RF_BUFFER_SIZE; // Read buffer head pos and increment;
-    while ((i != radioRXBuffer.tail) && (k < length-2))
-    {
-      // First, we update the buffer with the first byte in the frame
-      radioRXBuffer.buffer[radioRXBuffer.head] = tempFrame[k++];
-      radioRXBuffer.head = i; // Update the head
-      i = (i + 1) % RF_BUFFER_SIZE; // Increment i % BUFFER_SIZE
-    }
   }
 
   digitalWrite(RX_LED, LOW);  // Turn receive LED off, and we're out
 }
+

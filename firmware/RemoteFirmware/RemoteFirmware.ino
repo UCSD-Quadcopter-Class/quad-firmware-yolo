@@ -20,9 +20,6 @@ display to LCD screen, and transmit radio signals.
 #define I_ADDR  1
 #define D_ADDR  2
 
-#define ROLL_IDX 0
-#define YAW_IDX 1
-#define PITCH_IDX 2
 
 #include <EEPROM.h>
 #include <Gadgetron.h>	
@@ -30,13 +27,10 @@ display to LCD screen, and transmit radio signals.
 #include <serLCD.h>
 #include <Gimbal.h>
 #include <quad.h>
+#include <checksum.h>
+#include <Wire.h>
+#include <Adafruit_BMP280.h>
 #include "FlightController_StateMachine.h"
-struct controller {
-	uint8_t p;
-	uint8_t i;
-	uint8_t d;
-};
-typedef struct controller pid_controller;
 const long SHIFT_DELAY = 250;
 MomentaryButton btn1(PIN_BTN1);
 MomentaryButton btn2(PIN_BTN2);
@@ -52,7 +46,7 @@ int right_x = 2; //a2 roll
 int right_y = 3; //a3 pitch
 
 const int deadzone = 15;
-
+Adafruit_BMP280 bmp; // I2C
 //Gimbal objects
 Gimbal left_gimbal(left_x, left_y);
 Gimbal right_gimbal(right_x, right_y);
@@ -65,7 +59,7 @@ bool should_write_to_eeprom;
 Vector2 l_g_v, r_g_v;
 //LCD object
 serLCD mon;
-
+bool should_display_barometer;
 char * space = " ";
 long last_update_time;
 long t_curr;
@@ -98,7 +92,7 @@ void setup() {
 	mon.clear();
 	mon.display();
 	mon.setBrightness(15); // can go from 1-30
-
+	should_display_barometer = bmp.begin();
 	rfBegin(22);
 	last_update_time = 0;
 	//init serial monitor
@@ -159,13 +153,18 @@ void set_pid_value(const char * name, uint8_t & value) {
 
 extern "C" {
 	void do_default() {
+		int16_t buf[4] = { l_g_v.x, l_g_v.y, r_g_v.x, r_g_v.y };
 		if (should_update_display()) {
 			display_gimbal_pos(l_g_v, r_g_v);
+			/*
+			uint16_t checksum = fletcher16((uint8_t *)buf, 8);
+			mon.setCursor(0, 0);
+			mon.print(checksum);
+			*/
 		}
 		if (!view_debug)
 		{
-			int16_t buf[5] = { SECRET_NUMBER, l_g_v.x, l_g_v.y, r_g_v.x, r_g_v.y };
-			rfWrite((uint8_t*)buf, 10);
+			rfWrite((uint8_t*)buf, 8);
 		}
 	}
 	void do_music_mode() {
@@ -193,6 +192,14 @@ extern "C" {
 			mon.setCursor(1, 0);
 			print_val(final_freq);
 		}
+	}
+	void do_read_barometer(void) {
+		if (should_update_display()) {
+			mon.setCursor(0, 0) ;
+			mon.print("Altitude: ");
+			print_val(bmp.readAltitude(1013.25)*100);
+		}
+
 	}
 	void do_set_midpoint(void) {
 		left_gimbal.set_midpoint();
@@ -247,6 +254,7 @@ extern "C" {
 				EEPROM.write(sizeof(pid_controller) * i + D_ADDR, pid_controllers[i].d);
 			}
 		}
+		rfWrite((uint8_t*)pid_controllers, sizeof(pid_controller) * PID_VALUE_LENGTH);
 	}
 	void shift_control(int dirr) {
 		pid_idx += dirr + 3;
@@ -288,6 +296,12 @@ extern "C" {
 	}
 	bool should_shift_ctl_right() {
 		return l_g_v.x > GIMBAL_TILT_RIGHT;
+	}
+	bool pid_value_request() {
+		rf_get_msg_length() == 1 && is_radio_valid();
+	}
+	bool should_read_barometer() {
+		return should_display_barometer;
 	}
 	void on_any_transition() {
 		mon.clear();
