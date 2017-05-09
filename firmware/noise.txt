@@ -1,1 +1,8 @@
-We Low Pass Filtered and took a moving average of accelerometer readings to stabilize the output from the accelerometer. Then we used a complementary filter to combine the gyroscope (0.96) and accelerometer (0.04) readings. 
+To accurately estimate pitch and roll angles, we combine readings from the 
+gyroscope and accelerometer. Our algorithm is heavily based on the complementary
+filter. We first enable the lowpass filter and set the sensor's antialiasing to
+its smallest values to reduce accelerometer noise. We then take a windowed 
+average of the accelerometer's angle estimates. When our window is full, then
+we apply the complementary filter to estimate our angle. When our window is not 
+full, we update our angle estimate by only integrating the gyroscope's angular 
+velocity into the current angle estimate.
