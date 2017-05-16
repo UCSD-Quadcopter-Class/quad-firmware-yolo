@@ -34,7 +34,7 @@ display to LCD screen, and transmit radio signals.
 const long SHIFT_DELAY = 250;
 MomentaryButton btn1(PIN_BTN1);
 MomentaryButton btn2(PIN_BTN2);
-Buzzer buzzer(7);
+Buzzer buzzer(8);
 
 const int PID_VALUE_LENGTH = 3;
 bool view_debug = false;
@@ -45,7 +45,7 @@ int left_y = 1; //a1 throttle
 int right_x = 2; //a2 roll
 int right_y = 3; //a3 pitch
 
-const int deadzone = 15;
+const int deadzone = 40;
 Adafruit_BMP280 bmp; // I2C
 //Gimbal objects
 Gimbal left_gimbal(left_x, left_y);

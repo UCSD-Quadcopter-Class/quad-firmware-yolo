@@ -56,7 +56,7 @@ PID * pitch_controller;
 PID * roll_controller;
 PID * yaw_controller; 
 
-int8_t pitch_ctl;
+int16_t pitch_ctl;
 
 bool pid_setup = false;
 // Radio Variables
@@ -78,13 +78,13 @@ long t_curr = 0;
 float delta_time = 0;
 
 
-const int WINDOW_SIZE = (1 << 5);
+const int WINDOW_SIZE = (1 << 3);
 int window_index = 0;
 sensors_vec_t orientation_window_vec;
 sensors_vec_t target_vector;
 sensors_vec_t previous_error;
 sensors_vec_t error_acc_vec;
-float i_damp = .90f;
+float i_damp = .95f;
 
 void setup() {
 	rfBegin(22);
@@ -130,7 +130,7 @@ void pid_update() {
 	error_acc_vec = i_damp * error_acc_vec;
 }
 
-void pid_update(int idx, int8_t & val) {
+void pid_update(int idx, int16_t & val) {
 	auto pid = controllers[idx];
 	auto error = target_vector.v[idx] - angle.v[idx];
 	auto dE_dT = (error - previous_error.v[idx])/delta_time;
@@ -146,15 +146,15 @@ void pid_update(int idx, int8_t & val) {
 }
 
 void motor_update() {
-	float m1_ctl = 0;
-	float m2_ctl = 0; 
-	float m3_ctl = 0; 
-	float m4_ctl = 0; 
+	int m1_ctl = 0;
+	int m2_ctl = 0; 
+	int m3_ctl = 0; 
+	int m4_ctl = 0; 
 	if (throttle > 0) {
-		m1_ctl = max(throttle + pitch_ctl, 0);
-		m2_ctl = max(throttle + pitch_ctl, 0);
-		m3_ctl = max(throttle - pitch_ctl, 0);
-		m4_ctl = max(throttle - pitch_ctl, 0);
+		m1_ctl = constrain(throttle + pitch_ctl, 0,255);
+		m2_ctl = constrain(throttle + pitch_ctl, 0,255);
+		m3_ctl = constrain(throttle - pitch_ctl, 0,255);
+		m4_ctl = constrain(throttle - pitch_ctl, 0,255);
 	}
 	graph(m1_ctl);
 	analogWrite(motor_1_pin, m1_ctl);
@@ -253,7 +253,7 @@ void gimbal_radio() {
 			//Serial.print(" ");
 			gimbal_vec[i] = value;
 	}
-	throttle = map( gimbal_vec[1], _GIMBAL_MIN, _GIMBAL_MAX, 0, 75);
+	throttle = map( sqrt(gimbal_vec[1]), _GIMBAL_MIN, sqrt(_GIMBAL_MAX), 0, 200);
 	target_vector.pitch= map(gimbal_vec[2], _GIMBAL_MIN, _GIMBAL_MAX, -max_pitch_angle, max_pitch_angle);
 	target_vector.pitch= constrain(target_vector.pitch, -max_pitch_angle, max_pitch_angle);
 	//Serial.println();
