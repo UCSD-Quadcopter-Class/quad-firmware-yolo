@@ -5,6 +5,10 @@
 #define PITCH_IDX 1
 #define YAW_IDX 2
 
+#define P_ADDR  0
+#define I_ADDR  1
+#define D_ADDR  2
+
 #define SECRET_NUMBER 7890
 struct controller {
 	uint8_t p;
@@ -12,6 +16,7 @@ struct controller {
 	uint8_t d;
 };
 typedef struct controller pid_controller;
+
 struct quad_pid {
 	float p;
 	float i;

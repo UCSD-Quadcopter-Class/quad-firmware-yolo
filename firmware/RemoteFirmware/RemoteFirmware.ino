@@ -9,17 +9,6 @@ File Name:       remote_firmware.ino
 Description:     Contains RedBoard code for remote to read from gimbals,
 display to LCD screen, and transmit radio signals.
 *****************************************************************************/
-#define PIN_BTN1    16    // PG0 (schematic) G0 (red board)
-#define PIN_BTN2    17    // PG1 (schematic) G1 (red board)
-#define PIN_LED_BLUE  22    // PD6 (schematic) D4 (red board)
-#define PIN_LED_GRN   23    // PD5 (schematic) D5 (red board)
-#define PIN_LED_RED   24    // PD4 (schematic) D6 (red board)   
-#define UPDATE_TIME 50;
-
-#define P_ADDR  0
-#define I_ADDR  1
-#define D_ADDR  2
-
 
 #include <EEPROM.h>
 #include <Gadgetron.h>	
@@ -31,39 +20,8 @@ display to LCD screen, and transmit radio signals.
 #include <Wire.h>
 #include <Adafruit_BMP280.h>
 #include "FlightController_StateMachine.h"
-const long SHIFT_DELAY = 250;
-MomentaryButton btn1(PIN_BTN1);
-MomentaryButton btn2(PIN_BTN2);
-Buzzer buzzer(8);
+#include "Remote.h"
 
-const int PID_VALUE_LENGTH = 3;
-bool view_debug = false;
-
-//Gimbal pins
-int left_x = 0; //a0 yaw
-int left_y = 1; //a1 throttle
-int right_x = 2; //a2 roll
-int right_y = 3; //a3 pitch
-
-const int deadzone = 40;
-Adafruit_BMP280 bmp; // I2C
-//Gimbal objects
-Gimbal left_gimbal(left_x, left_y);
-Gimbal right_gimbal(right_x, right_y);
-
-int major_notes[7] = { 0, 2, 4, 5, 7, 9, 11 };
-pid_controller pid_controllers[PID_VALUE_LENGTH];
-
-bool should_write_to_eeprom;
-
-Vector2 l_g_v, r_g_v;
-//LCD object
-serLCD mon;
-bool should_display_barometer;
-char * space = " ";
-long last_update_time;
-long t_curr;
-int pid_idx;
 /********************************************************************
 | Routine Name: setup
 | File:         remote_firmware.ino
@@ -130,6 +88,7 @@ void clamp_at_deadzone(int16_t & val) {
 		val = _GIMBAL_MID;
 	}
 }
+
 bool should_update_display() {
 	bool rv = t_curr - last_update_time > UPDATE_TIME;
 	if (rv) {
@@ -309,18 +268,7 @@ extern "C" {
 		buzzer.playSemitone(major_notes[state % 7], 100);
 	}
 }
-/********************************************************************
-| Routine Name: display_gimbal_pos
-| File:         remote_firmware.ino
-|
-| Description: Display gimbal values on LCD screen
-|
-| Parameter Descriptions:
-| name               description
-| ------------------ -----------------------------------------------
-| l_g_v (Vector2)    left gimbal values
-| r_g_v (Vector2)    right gimbal values
-********************************************************************/
+
 void display_gimbal_pos(Vector2 l_g_v, Vector2 r_g_v) {
 	//mon.clear() is slow, don't use it if possible
 	mon.setCursor(0, 0);
@@ -350,18 +298,7 @@ void print_val(int val) {
 	if (val < 10)
 		mon.print(space);
 }
-/********************************************************************
-| Routine Name: print_gimbal_pos
-| File:         remote_firmware.ino
-|
-| Description: Print gimbal values to serial monitor
-|
-| Parameter Descriptions:
-| name               description
-| ------------------ -----------------------------------------------
-| l_g_v (Vector2)    left gimbal values
-| r_g_v (Vector2)    right gimbal values
-********************************************************************/
+
 void print_gimbal_pos(Vector2 l_g_v, Vector2 r_g_v) {
 	Serial.print(l_g_v.x);
 	Serial.print("\t");
