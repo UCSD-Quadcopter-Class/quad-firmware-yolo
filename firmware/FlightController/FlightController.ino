@@ -57,6 +57,7 @@ PID * roll_controller;
 PID * yaw_controller; 
 
 int16_t pitch_ctl;
+int16_t roll_ctl;
 
 bool pid_setup = false;
 // Radio Variables
@@ -65,8 +66,8 @@ int16_t* radio_addr;
 int16_t gimbal_vec[4];
 
 int16_t throttle;
-int8_t target_roll_angle;
-const int max_pitch_angle = 20;
+const int max_pitch_angle = 25;
+const int max_roll_angle = max_pitch_angle;
 uint8_t motor_1_pin = 4;
 uint8_t motor_2_pin = 3;
 uint8_t motor_3_pin = 8;
@@ -121,28 +122,33 @@ void loop() {
 	pid_update();
 	motor_update();
 	t_last = t_curr;
-	graph(1.0f / delta_time);
+	//graph(1.0f / delta_time);
 }
 
 void pid_update() {
 	// Roll
-	pid_update(PITCH_IDX, pitch_ctl);
+	pid_update(PITCH_IDX, pitch_ctl, false);
+	pid_update(ROLL_IDX, roll_ctl, true);
 	error_acc_vec = i_damp * error_acc_vec;
 }
 
-void pid_update(int idx, int16_t & val) {
+void pid_update(int idx, int16_t & val, bool debug) {
 	auto pid = controllers[idx];
 	auto error = target_vector.v[idx] - angle.v[idx];
 	auto dE_dT = (error - previous_error.v[idx])/delta_time;
 	auto & error_acc = error_acc_vec.v[idx];
-	graph(target_vector.v[idx]);
-	graph(angle.v[idx]);
-	graph(error);
+	if (debug) {
+		graph(target_vector.v[idx]);
+		graph(angle.v[idx]);
+		graph(error);
+	}
 	error_acc += (error * delta_time);
 	auto new_ctl = pid.p * error + pid.i * error_acc + pid.d * dE_dT;
 	val = constrain(new_ctl, -255, 255);
 	previous_error.v[idx] = error;
-	graph(val);
+	if (debug) {
+		graph(val);
+	}
 }
 
 void motor_update() {
@@ -151,12 +157,12 @@ void motor_update() {
 	int m3_ctl = 0; 
 	int m4_ctl = 0; 
 	if (throttle > 0) {
-		m1_ctl = constrain(throttle + pitch_ctl, 0,255);
-		m2_ctl = constrain(throttle + pitch_ctl, 0,255);
-		m3_ctl = constrain(throttle - pitch_ctl, 0,255);
-		m4_ctl = constrain(throttle - pitch_ctl, 0,255);
+		m1_ctl = constrain(throttle + pitch_ctl + roll_ctl, 0,255);
+		m2_ctl = constrain(throttle + pitch_ctl - roll_ctl, 0,255);
+		m3_ctl = constrain(throttle - pitch_ctl - roll_ctl, 0,255);
+		m4_ctl = constrain(throttle - pitch_ctl + roll_ctl, 0,255);
 	}
-	graph(m1_ctl);
+	//graph(m1_ctl);
 	analogWrite(motor_1_pin, m1_ctl);
 	analogWrite(motor_2_pin, m2_ctl);
 	analogWrite(motor_3_pin, m3_ctl);
@@ -182,10 +188,11 @@ void debug_imu() {
 	sensors_event_t a, m, g, temp;
 	sensors_vec_t orientation;
 	gyroscope.getEvent(&g);
+	g.gyro.roll = -g.gyro.roll;
 	angle = angle + (delta_time * g.gyro);
-	//graph(angle.y);
 	if (ahrs.getOrientation(&orientation))
 	{
+		//graph(orientation);
 		//graph(orientation.y);
 		orientation_window_vec = orientation + orientation_window_vec;
 		window_index++;
@@ -197,14 +204,10 @@ void debug_imu() {
 			angle = (complementary_gain * angle) + ((1.0f - complementary_gain) * orientation_window_vec);
 			orientation_window_vec *= 0;
 		}
-		//delay(100);
 		//graph(angle);
 		Serial.println();
 	}
-	//Serial.println(delta_time);
 	//lsm.getEvent(&a, &m, &g, &temp);
-	//graph_vec(a.acceleration);
-	//graph_vec(g.gyro);
 }
 
 inline void graph(int val) {
@@ -246,6 +249,10 @@ void pid_radio() {
     Serial.println( temp.d );
   }
 }
+void set_target( float & target, float reading, float max_angle ) {
+    target = map(reading, _GIMBAL_MIN, _GIMBAL_MAX, -max_angle, max_angle);
+    target = constrain(target, -max_angle, max_angle);
+}
 void gimbal_radio() {
 	for (int i = 0; i < 4; i++) {
 			int16_t value = ((int16_t*)radio_buffer)[i];
@@ -253,8 +260,10 @@ void gimbal_radio() {
 			//Serial.print(" ");
 			gimbal_vec[i] = value;
 	}
-	throttle = map( sqrt(gimbal_vec[1]), _GIMBAL_MIN, sqrt(_GIMBAL_MAX), 0, 200);
-	target_vector.pitch= map(gimbal_vec[2], _GIMBAL_MIN, _GIMBAL_MAX, -max_pitch_angle, max_pitch_angle);
-	target_vector.pitch= constrain(target_vector.pitch, -max_pitch_angle, max_pitch_angle);
+	throttle = map( gimbal_vec[1], _GIMBAL_MIN, _GIMBAL_MAX, 0, 200);
+    set_target( target_vector.pitch, gimbal_vec[2], max_pitch_angle );
+    set_target( target_vector.roll, gimbal_vec[3], max_roll_angle);
+	//target_vector.pitch= map(gimbal_vec[2], _GIMBAL_MIN, _GIMBAL_MAX, -max_pitch_angle, max_pitch_angle);
+	//target_vector.pitch= constrain(target_vector.pitch, -max_pitch_angle, max_pitch_angle);
 	//Serial.println();
 }

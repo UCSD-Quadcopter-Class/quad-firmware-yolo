@@ -24,6 +24,8 @@
                         collected into a buffer here.
 */
   
+#ifndef RFRADIO
+#define RFRADIO
 #include <Arduino.h> // Required for digitalWrites, etc.
 #include "checksum.h"
 
@@ -296,3 +298,4 @@ ISR(TRX24_RX_END_vect)
   digitalWrite(RX_LED, LOW);  // Turn receive LED off, and we're out
 }
 
+#endif
