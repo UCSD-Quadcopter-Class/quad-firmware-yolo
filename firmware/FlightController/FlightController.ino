@@ -58,6 +58,7 @@ PID * yaw_controller;
 
 int16_t pitch_ctl;
 int16_t roll_ctl;
+int16_t yaw_ctl;
 
 bool pid_setup = false;
 // Radio Variables
@@ -66,6 +67,7 @@ int16_t* radio_addr;
 int16_t gimbal_vec[4];
 
 int16_t throttle;
+const float max_yaw_speed = 4;
 const int max_pitch_angle = 25;
 const int max_roll_angle = max_pitch_angle;
 uint8_t motor_1_pin = 4;
@@ -85,7 +87,7 @@ sensors_vec_t orientation_window_vec;
 sensors_vec_t target_vector;
 sensors_vec_t previous_error;
 sensors_vec_t error_acc_vec;
-float i_damp = .95f;
+float i_damp = .999f;
 
 void setup() {
 	rfBegin(22);
@@ -128,7 +130,9 @@ void loop() {
 void pid_update() {
 	// Roll
 	pid_update(PITCH_IDX, pitch_ctl, false);
-	pid_update(ROLL_IDX, roll_ctl, true);
+	pid_update(ROLL_IDX, roll_ctl, false);
+	pid_update(YAW_IDX, yaw_ctl, true);
+	//yaw_ctl = target_vector.heading;
 	error_acc_vec = i_damp * error_acc_vec;
 }
 
@@ -157,10 +161,10 @@ void motor_update() {
 	int m3_ctl = 0; 
 	int m4_ctl = 0; 
 	if (throttle > 0) {
-		m1_ctl = constrain(throttle + pitch_ctl + roll_ctl, 0,255);
-		m2_ctl = constrain(throttle + pitch_ctl - roll_ctl, 0,255);
-		m3_ctl = constrain(throttle - pitch_ctl - roll_ctl, 0,255);
-		m4_ctl = constrain(throttle - pitch_ctl + roll_ctl, 0,255);
+		m1_ctl = constrain(throttle + pitch_ctl + roll_ctl + yaw_ctl, 0,255);
+		m2_ctl = constrain(throttle + pitch_ctl - roll_ctl - yaw_ctl, 0,255);
+		m3_ctl = constrain(throttle - pitch_ctl - roll_ctl + yaw_ctl, 0,255);
+		m4_ctl = constrain(throttle - pitch_ctl + roll_ctl - yaw_ctl, 0,255);
 	}
 	//graph(m1_ctl);
 	analogWrite(motor_1_pin, m1_ctl);
@@ -204,6 +208,7 @@ void debug_imu() {
 			angle = (complementary_gain * angle) + ((1.0f - complementary_gain) * orientation_window_vec);
 			orientation_window_vec *= 0;
 		}
+		angle.z = g.gyro.z;
 		//graph(angle);
 		Serial.println();
 	}
@@ -237,6 +242,7 @@ void radio_update() {
 
 void pid_radio() {
   pid_controller ctrl_in[3];
+  error_acc_vec = 0 * error_acc_vec;
   for( int i = 0; i < 3; i++ ) {
     auto & temp = controllers[i];
     temp.p = radio_buffer[ i * 3 + 0]/PID_RADIO_SCALAR;
@@ -261,9 +267,8 @@ void gimbal_radio() {
 			gimbal_vec[i] = value;
 	}
 	throttle = map( gimbal_vec[1], _GIMBAL_MIN, _GIMBAL_MAX, 0, 200);
+    set_target( target_vector.heading, gimbal_vec[0], max_yaw_speed);
     set_target( target_vector.pitch, gimbal_vec[2], max_pitch_angle );
     set_target( target_vector.roll, gimbal_vec[3], max_roll_angle);
-	//target_vector.pitch= map(gimbal_vec[2], _GIMBAL_MIN, _GIMBAL_MAX, -max_pitch_angle, max_pitch_angle);
-	//target_vector.pitch= constrain(target_vector.pitch, -max_pitch_angle, max_pitch_angle);
 	//Serial.println();
 }

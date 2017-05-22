@@ -1,2 +1,4 @@
 *.vc*
 *.vsarduino*
+main
+*.o
