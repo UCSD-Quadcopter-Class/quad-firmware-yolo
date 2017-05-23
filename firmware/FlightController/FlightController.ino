@@ -6,12 +6,12 @@
 #include<radio.h>
 #include<quad.h>
 #include<Gimbal.h>
+#include "rotation.h"
+#include "vectors.h"
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM9DS1.h>
 #include <Adafruit_Simple_AHRS.h>
 #include <Adafruit_Sensor_Set.h>
-#include <Mahony.h>
-#include <Madgwick.h>
 
 sensors_vec_t operator+(sensors_vec_t  src, sensors_vec_t   rhs) {
 	src.x += rhs.x;
@@ -44,12 +44,12 @@ sensors_vec_t operator+=(sensors_vec_t a, sensors_vec_t b) {
 // Sensors
 Adafruit_LSM9DS1 lsm = Adafruit_LSM9DS1();  // i2c sensor
 Adafruit_Simple_AHRS ahrs(&(lsm._accelSensor), &(lsm._magSensor) );
-sensors_event_t accel, mag, gyro, temp;
 sensors_vec_t angle;
+quaternion orientation;
 Adafruit_LSM9DS1::Sensor gyroscope;
 // Magic Numbers~
 const float complementary_gain = .96f;
-const float PID_RADIO_SCALAR = 64;
+const float PID_RADIO_SCALAR = 4;
 // PID Variables
 PID controllers[3];
 PID * pitch_controller; 
@@ -59,6 +59,14 @@ PID * yaw_controller;
 int16_t pitch_ctl;
 int16_t roll_ctl;
 int16_t yaw_ctl;
+sensors_event_t a, m, g, temp;
+
+float const deg2rad = PI / 180;
+bool has_set;
+vector3 forward, right, up, one, zero, reference;
+
+vector3 accel_acc, error, error_old, delta_error, error_acc;
+
 
 bool pid_setup = false;
 // Radio Variables
@@ -68,8 +76,8 @@ int16_t gimbal_vec[4];
 
 int16_t throttle;
 const float max_yaw_speed = 4;
-const int max_pitch_angle = 25;
-const int max_roll_angle = max_pitch_angle;
+const float max_pitch_angle = .3;
+const float max_roll_angle = max_pitch_angle;
 uint8_t motor_1_pin = 4;
 uint8_t motor_2_pin = 3;
 uint8_t motor_3_pin = 8;
@@ -80,16 +88,22 @@ long t_last = 0;
 long t_curr = 0;
 float delta_time = 0;
 
+vector3 target_vector;
 
 const int WINDOW_SIZE = (1 << 3);
 int window_index = 0;
-sensors_vec_t orientation_window_vec;
-sensors_vec_t target_vector;
+sensors_vec_t orientation_window_vec_old;
 sensors_vec_t previous_error;
 sensors_vec_t error_acc_vec;
-float i_damp = .999f;
+float i_damp = .99f;
 
 void setup() {
+	forward = make_vector(0, -1, 0);
+	up = make_vector(0, 0, -1);
+	right = make_vector(1, 0, 0);
+	one = make_vector(1, 1, 1);
+	zero = make_vector(0, 1, 0);
+	reference = up;
 	rfBegin(22);
 	Serial.begin(115200);
 	radio_addr = (int16_t*) &TRXFBST;
@@ -97,7 +111,9 @@ void setup() {
 	angle *= 0;
 	previous_error *= 0;
 	error_acc_vec *= 0;
-	orientation_window_vec = 0 * orientation_window_vec ;
+	error_old = zero;
+	accel_acc = zero;
+	orientation_window_vec_old = 0 * orientation_window_vec_old ;
 	for (int i = 0; i < 3; i++) {
 		controllers[i].p = 50;
 	}
@@ -129,29 +145,30 @@ void loop() {
 
 void pid_update() {
 	// Roll
-	pid_update(PITCH_IDX, pitch_ctl, false);
-	pid_update(ROLL_IDX, roll_ctl, false);
-	pid_update(YAW_IDX, yaw_ctl, true);
+	vector3 curr = orientation * reference;
+	curr.z = g.gyro.z/(1.0f* (1<<9));
+	error = target_vector - curr;
+	delta_error = (error - error_old) / delta_time;
+	error_acc = error + (error );
+	print(error);
+	pid_update(0, pitch_ctl, true);
+	pid_update(1, roll_ctl, false);
+	pid_update(2, yaw_ctl, false);
 	//yaw_ctl = target_vector.heading;
-	error_acc_vec = i_damp * error_acc_vec;
+	error_acc = i_damp * error_acc;
+	error_old = error;
 }
 
 void pid_update(int idx, int16_t & val, bool debug) {
 	auto pid = controllers[idx];
-	auto error = target_vector.v[idx] - angle.v[idx];
-	auto dE_dT = (error - previous_error.v[idx])/delta_time;
-	auto & error_acc = error_acc_vec.v[idx];
 	if (debug) {
-		graph(target_vector.v[idx]);
-		graph(angle.v[idx]);
-		graph(error);
+		graph(target_vector.components[idx]);
 	}
-	error_acc += (error * delta_time);
-	auto new_ctl = pid.p * error + pid.i * error_acc + pid.d * dE_dT;
+	auto new_ctl = pid.p * error.components[idx] + pid.i * error_acc.components[idx] + pid.d * delta_error.components[idx];
 	val = constrain(new_ctl, -255, 255);
-	previous_error.v[idx] = error;
 	if (debug) {
 		graph(val);
+		graph(error_acc.components[idx]);
 	}
 }
 
@@ -161,10 +178,10 @@ void motor_update() {
 	int m3_ctl = 0; 
 	int m4_ctl = 0; 
 	if (throttle > 0) {
-		m1_ctl = constrain(throttle + pitch_ctl + roll_ctl + yaw_ctl, 0,255);
-		m2_ctl = constrain(throttle + pitch_ctl - roll_ctl - yaw_ctl, 0,255);
-		m3_ctl = constrain(throttle - pitch_ctl - roll_ctl + yaw_ctl, 0,255);
-		m4_ctl = constrain(throttle - pitch_ctl + roll_ctl - yaw_ctl, 0,255);
+		m1_ctl = constrain(throttle - pitch_ctl + roll_ctl + yaw_ctl, 0,255);
+		m2_ctl = constrain(throttle - pitch_ctl - roll_ctl - yaw_ctl, 0,255);
+		m3_ctl = constrain(throttle + pitch_ctl - roll_ctl + yaw_ctl, 0,255);
+		m4_ctl = constrain(throttle + pitch_ctl + roll_ctl - yaw_ctl, 0,255);
 	}
 	//graph(m1_ctl);
 	analogWrite(motor_1_pin, m1_ctl);
@@ -189,30 +206,40 @@ inline void integrate(sensors_vec_t & acc, sensors_vec_t & new_value) {
 }
 
 void debug_imu() {
-	sensors_event_t a, m, g, temp;
-	sensors_vec_t orientation;
-	gyroscope.getEvent(&g);
-	g.gyro.roll = -g.gyro.roll;
-	angle = angle + (delta_time * g.gyro);
-	if (ahrs.getOrientation(&orientation))
+	lsm.read();  /* ask it to read in the data */
+				 /* Get a new sensor event */
+	sensors_vec_t adafruit_orientation;
+
+	lsm.getEvent(&a, &m, &g, &temp);
+	vector3 accel = normalize(vec_from_sensor(a.acceleration));
+	vector3 gyro = deg2rad * delta_time * vec_from_sensor(g.gyro);
+	if (!has_set) {
+		orientation = make_quaternion(reference, accel);
+		has_set = true;
+	}
+	else {
+		rotate_by_gyro(gyro.y, forward);
+		rotate_by_gyro(gyro.z, up);
+			//graph(orientation_window_vec.y / window_index);
+		rotate_by_gyro(gyro.x, right);
+	}
 	{
-		//graph(orientation);
-		//graph(orientation.y);
-		orientation_window_vec = orientation + orientation_window_vec;
+		orientation_window_vec_old = adafruit_orientation + orientation_window_vec_old;
+		accel_acc = accel_acc + accel;
 		window_index++;
 		if (window_index > WINDOW_SIZE) {
 			window_index = 0;
-			orientation_window_vec = orientation_window_vec / WINDOW_SIZE;
-			//graph(orientation_window_vec.y / window_index);
+			accel_acc = accel_acc / WINDOW_SIZE;
 			// Do Complementary filter here
-			angle = (complementary_gain * angle) + ((1.0f - complementary_gain) * orientation_window_vec);
-			orientation_window_vec *= 0;
+			orientation = slerp(orientation, make_quaternion(reference, accel_acc), 1-complementary_gain);
+			orientation_window_vec_old *= 0;
+			accel_acc = zero;
 		}
+		//print(accel);
+		//print(orientation * reference);
 		angle.z = g.gyro.z;
-		//graph(angle);
 		Serial.println();
 	}
-	//lsm.getEvent(&a, &m, &g, &temp);
 }
 
 inline void graph(int val) {
@@ -256,8 +283,8 @@ void pid_radio() {
   }
 }
 void set_target( float & target, float reading, float max_angle ) {
-    target = map(reading, _GIMBAL_MIN, _GIMBAL_MAX, -max_angle, max_angle);
-    target = constrain(target, -max_angle, max_angle);
+    target = map(reading, _GIMBAL_MIN, _GIMBAL_MAX, -max_angle * 100, max_angle * 100);
+    target = constrain(target, -max_angle * 100, max_angle * 100)/100.f;
 }
 void gimbal_radio() {
 	for (int i = 0; i < 4; i++) {
@@ -267,8 +294,29 @@ void gimbal_radio() {
 			gimbal_vec[i] = value;
 	}
 	throttle = map( gimbal_vec[1], _GIMBAL_MIN, _GIMBAL_MAX, 0, 200);
-    set_target( target_vector.heading, gimbal_vec[0], max_yaw_speed);
-    set_target( target_vector.pitch, gimbal_vec[2], max_pitch_angle );
-    set_target( target_vector.roll, gimbal_vec[3], max_roll_angle);
+    set_target( target_vector.z, gimbal_vec[0], max_yaw_speed);
+    set_target( target_vector.x, gimbal_vec[2], max_pitch_angle );
+    set_target( target_vector.y, gimbal_vec[3], max_roll_angle);
 	//Serial.println();
+}
+void rotate_by_gyro(float rads, vector3 temp) {
+	quaternion q(cos(rads / 2), sin(rads / 2) * temp);
+	orientation = q * orientation;
+}
+void print(vector3 val) {
+	print(val.x);
+	print(val.y);
+	print(val.z);
+}
+void print(float val) {
+	Serial.print(val);
+	Serial.print("\t");
+}
+
+vector3 vec_from_sensor(sensors_vec_t v) {
+	vector3 rv;
+	rv.x = v.x;
+	rv.y = v.y;
+	rv.z = v.z;
+	return rv;
 }

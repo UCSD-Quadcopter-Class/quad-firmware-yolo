@@ -28,6 +28,12 @@ vector3 operator+( vector3 v, vector3 u ) {
     v.z += u.z;
     return v;
 }
+vector3 operator-( vector3 v, vector3 u ) {
+    v.x -= u.x;
+    v.y -= u.y;
+    v.z -= u.z;
+    return v;
+}
 void set_vector( vector3 & v, float x, float y, float z) {
     v.x = x;
     v.y = y;
@@ -82,6 +88,15 @@ vector3 cross_product( vector3 a, vector3 b ) {
     rv.z =  a.x * b.y - a.y * b.x;
     return rv;
 }
+vector3 make_vector(  float x, float y, float z) {
+    vector3 rv;
+    rv.x = x;
+    rv.y = y;
+    rv.z = z;
+    return rv;
+}
+
+
 /**
 vector3::vector3_t() : vector3_t(0,0,0) {}
 vector3::vector3_t(float x, float y, float z) {

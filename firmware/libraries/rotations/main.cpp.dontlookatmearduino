@@ -130,12 +130,9 @@ void test_rotations() {
 int main( ) {
 //debug_quaternion_def() ;
 //debug_quaternion_ops() ;
-    DEBUG( sizeof(quaternion) );
-    DEBUG( sizeof(vector3) );
+  DEBUG( sizeof(quaternion) );
+  DEBUG( sizeof(vector3) );
   vector3 up, forward, right, whoa, v;
-  set_vector( up, 0, 1, 0);
-  set_vector( forward, 0, 0, 1);
-  set_vector( right, 1, 0, 0);
   quaternion q, q2, lerped, q_new;
   float theta = M_PI/4;
   set_vector( q.v, 4,1,1);  
@@ -147,10 +144,8 @@ int main( ) {
   debug( normalize(q) );
   DEBUG( magnitude(q) );
   DEBUG( magnitude(normalize(q)) );
-  whoa = q*v;
-  v = up;
+  v = vector3::up;
   vector3 rotated = q * v;
-
   cout << "initial: " ;
   debug( v );
   cout << "rotated: " ;
