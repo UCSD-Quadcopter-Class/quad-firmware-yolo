@@ -1,4 +1,5 @@
 #include "vectors.h"
+#include "math.h"
 
 
 float dot_product( float * a, float * b, int n ) {
@@ -45,6 +46,12 @@ vector3 operator*( vector3 v, float k ) {
     v.z *= k;
     return v;
 }
+vector3 operator/( vector3 v, float k ) {
+    v.x /= k;
+    v.y /= k;
+    v.z /= k;
+    return v;
+}
 vector3 operator*( float k, vector3 v ){
     v.x *= k;
     v.y *= k;
@@ -56,3 +63,31 @@ vector3 operator*( float k, vector3 v ){
 float dot_product( vector3 a, vector3 b ) {
     return dot_product( a.components, b.components, 3 );
 }
+
+float sqr_magnitude( vector3 v ) {
+    return dot_product( v, v );
+}
+
+float magnitude( vector3 v ) {
+    return sqrt( sqr_magnitude( v) );
+}
+vector3 normalize( vector3 v )  {
+    return v/magnitude(v);
+}
+
+vector3 cross_product( vector3 a, vector3 b ) {
+    vector3 rv;
+    rv.x =  a.y * b.z - a.z * b.y;
+    rv.y = -a.x * b.z + a.z * b.x;
+    rv.z =  a.x * b.y - a.y * b.x;
+    return rv;
+}
+/**
+vector3::vector3_t() : vector3_t(0,0,0) {}
+vector3::vector3_t(float x, float y, float z) {
+    this->x = x;
+    this->y = y;
+    this->z = z;
+}
+
+*/

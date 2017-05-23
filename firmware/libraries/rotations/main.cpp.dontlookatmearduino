@@ -1,0 +1,185 @@
+#ifndef ARDUINO
+#include "rotation.h"
+#include <iostream>
+#include "math.h"
+
+using namespace std;
+#define DEBUG( x ) cout << "Value of "#x ": " << (x) << endl   
+void debug_quaternion_def() {
+    quaternion q;
+    q.q0 = 1;
+    q.q1 = 2;
+    q.q2 = 3;
+    q.q3 = 4;
+
+    DEBUG( q.q0 );
+    DEBUG( q.q1 );
+    DEBUG( q.q2 );
+    DEBUG( q.q3 );
+
+    DEBUG( q.v.components[0] );
+    DEBUG( q.v.components[1] );
+    DEBUG( q.v.components[2] );
+
+    DEBUG( q.w );
+    DEBUG( q.x );
+    DEBUG( q.y );
+    DEBUG( q.z );
+}
+void debug_vector( ) {
+    vector3 a, b;
+    a.x = 1;
+    a.y = 0;
+    a.z = 3;
+    b.x = 8;
+    b.y = 0;
+    b.z = 2;
+    DEBUG( dot_product( a , b ));
+ 
+}
+
+void debug_vec() {
+   vector3 v,u;
+   v.x = 1;
+   v.y = 2;
+   v.z = 3;
+   DEBUG(v.x);
+   DEBUG(v.y);
+   DEBUG(v.z);
+   v = -v;
+   DEBUG(v.x);
+   DEBUG(v.y);
+   DEBUG(v.z);
+ 
+}
+
+void debug_quaternion_ops() {
+  quaternion p, q, r;
+  p.q0 =  3;
+  p.q1 =  1;
+  p.q2 = -2;
+  p.q3 =  1;
+
+  q.q0 =  2;
+  q.q1 = -1;
+  q.q2 =  2;
+  q.q3 =  3;
+  r = p * q;
+  DEBUG( r.q0 );
+  DEBUG( r.q1 );
+  DEBUG( r.q2 );
+  DEBUG( r.q3 );
+  r = *r;
+  DEBUG( r.q0 );
+  DEBUG( r.q1 );
+  DEBUG( r.q2 );
+  DEBUG( r.q3 );
+ 
+}
+void debug( vector3 v, bool print_nl=true ) {
+  cout << "< " 
+     << v.x <<"  " 
+     << v.y <<"  " 
+     << v.z <<" >";
+     if( print_nl )
+         cout << endl; 
+}
+
+void debug(quaternion q) {
+  cout << "( "
+  << q.w << "  ";
+  debug( q.v, false );
+  cout << ")";
+  cout << endl;
+  /**
+  DEBUG( &q.x );
+  DEBUG( &q.y );
+  DEBUG( &q.z );
+  DEBUG( &q.q0 );
+  DEBUG( &q.w );
+  DEBUG( sizeof(quaternion) );
+  */
+}
+
+void test_rotations() {
+  vector3 up, forward, right, whoa;
+  quaternion q, q2, lerped;
+  float theta = M_PI/4;
+  q.x = 0;
+  q.y = sin(theta/2);
+  q.z = 0;
+  q.w = cos(theta/2);
+
+  q2.x = 0;
+  q2.y = 0;
+  q2.z = sin(theta/2);
+  q2.w = cos(theta/2);
+  q2 = normalize(q2);
+
+  lerped = lerp( q, q2, .25); 
+  DEBUG( magnitude( q ) );
+  DEBUG( magnitude( q2 ) );
+  DEBUG( magnitude( lerped) );
+
+  //DEBUG( sizeof(vector3) );
+
+  whoa = (q) * whoa;
+  debug (whoa);
+
+}
+int main( ) {
+//debug_quaternion_def() ;
+//debug_quaternion_ops() ;
+    DEBUG( sizeof(quaternion) );
+    DEBUG( sizeof(vector3) );
+  vector3 up, forward, right, whoa, v;
+  set_vector( up, 0, 1, 0);
+  set_vector( forward, 0, 0, 1);
+  set_vector( right, 1, 0, 0);
+  quaternion q, q2, lerped, q_new;
+  float theta = M_PI/4;
+  set_vector( q.v, 4,1,1);  
+  q = quaternion( cos(theta/2), sin(theta/2) * normalize( q.v ));
+  debug( q);
+
+  cout << "initial rot: ";
+  debug( q );
+  debug( normalize(q) );
+  DEBUG( magnitude(q) );
+  DEBUG( magnitude(normalize(q)) );
+  whoa = q*v;
+  v = up;
+  vector3 rotated = q * v;
+
+  cout << "initial: " ;
+  debug( v );
+  cout << "rotated: " ;
+  debug( rotated );
+
+
+  DEBUG( theta );
+  DEBUG( theta*180/M_PI );
+  DEBUG( acos( dot_product(v, rotated )) );
+  float dot = dot_product( v, rotated ) ;
+  float real_theta = ( acos( dot ) );
+  DEBUG(dot);
+  cout << "cross product: " ;
+  debug( (cross_product(v, rotated )));
+  //DEBUG( magnitude(cross_product(v, q*v)/sin(real_theta)));  
+  vector3 cross = cross_product(v, rotated );
+  q.w = q2.w = 0;
+  q.v = v;
+  q2.v = rotated;
+  q_new = (*q) * q2; 
+  q_new.w += 1;
+  //q_new.v = cross ;//* sin( real_theta/2 ); 
+  //q_new.w = sqrt( sqr_magnitude(v) + sqr_magnitude(rotated) ) + dot; 
+  q_new = normalize( q_new );
+
+  cout << "output: " ;
+  debug( normalize(q_new) );
+  debug( q_new * v  );
+
+  return 0;
+}
+#endif

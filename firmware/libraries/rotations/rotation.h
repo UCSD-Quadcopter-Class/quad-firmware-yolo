@@ -11,11 +11,16 @@ struct rotation_matrix_t {
         };
     };
 };
-typedef struct rotation_matrix_t rotation_matrix;
 
-struct quaternion_t {
-    union {
+typedef struct rotation_matrix_t rotation_matrix;
+union quaternion_t {
         float components[4];
+        struct{
+            float x;
+            float y;
+            float z;
+            float w;
+        };
         struct{
             union { 
                 struct {
@@ -27,26 +32,30 @@ struct quaternion_t {
             };
             float q0;
         };
-        struct{
-            float x;
-            float y;
-            float z;
-            float w;
-        };
-    };
+        quaternion_t ();
+        quaternion_t (float w, float x, float y, float z);
+        quaternion_t (float w, vector3 v);
 };
 
-typedef struct quaternion_t quaternion;
+typedef union quaternion_t quaternion;
 
 void rotate( rotation_matrix R, vector3 & v, vector3 & out ) ;
 
+// Inverse operator
+quaternion operator-(quaternion p );
 // Complex conjugate operator
 quaternion operator*(quaternion p );
 quaternion operator*(quaternion p, quaternion q);
 quaternion operator*(float k, quaternion q);
+quaternion operator/(quaternion q, float k);
 quaternion operator+(quaternion p, quaternion q);
 vector3 operator*(quaternion q, vector3 v);
 float magnitude( quaternion q );
+float sqr_magnitude( quaternion q );
 quaternion lerp( quaternion p, quaternion q, float t );
+quaternion normalize( quaternion q );
+quaternion make_quaternion( vector3 u, vector3 v );
+quaternion slerp( quaternion p, quaternion q, float t );
+float dot_product( quaternion p, quaternion q ) ;
 
 #endif
